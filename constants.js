@@ -2,12 +2,14 @@
  * Shared config and static data for CineVault (proj pro 3).
  * Edit API_KEY here if OMDb rejects requests.
  */
+const localSecrets = window.CineVaultSecrets || {};
+
 window.CineVaultConfig = {
   // OMDb key (used by the current code). Put your own key here or replace with TMDb logic later.
-  API_KEY: '',
+  API_KEY: localSecrets.API_KEY || '',
   BASE_URL: 'https://www.omdbapi.com/',
   // HuggingFace token (used by the AI guide). Replace later or disable AI if not needed.
-  HF_API_TOKEN: '',
+  HF_API_TOKEN: localSecrets.HF_API_TOKEN || '',
   HF_MODEL: 'katanemo/Arch-Router-1.5B',
   HF_CHAT_URL: 'https://router.huggingface.co/hf-inference/models/katanemo/Arch-Router-1.5B/v1/chat/completions',
   AI_SYSTEM_PROMPT:
