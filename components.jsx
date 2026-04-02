@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
-const { API_KEY, BASE_URL, HF_API_TOKEN, HF_MODEL, HF_CHAT_URL, BINGO_CELLS } = window.CineVaultConfig;
-const { omdbJson, buildHfChatMessages } = window.CineVaultApi;
+const { HF_API_TOKEN, HF_MODEL, HF_CHAT_URL, BINGO_CELLS } = window.CineVaultConfig;
+const { tmdbJson, mapTmdbListMovie, buildHfChatMessages } = window.CineVaultApi;
 const { StarIcon, HeartIcon, BookmarkIcon, SearchIcon, FilmIcon, PlayIcon, ExternalIcon, EmptyBoxIcon, ListIcon } = window.CineVaultIcons;
 const { useBingo } = window.CineVaultHooks;
 
@@ -93,8 +93,9 @@ const send = async (text) => {
     const newRecs = {};
     await Promise.all(titles.slice(0,4).map(async title => {
       try {
-        const d = await omdbJson(`${BASE_URL}?apikey=${API_KEY}&t=${encodeURIComponent(title)}&type=movie`);
-        if (d.Response==='True') newRecs[title.toLowerCase()] = {id:d.imdbID, title:d.Title, release_date:d.Year, poster_path:d.Poster, imdbRating:d.imdbRating};
+        const d = await tmdbJson(`search/movie?query=${encodeURIComponent(title)}`);
+        const first = d.results && d.results[0];
+        if (first) newRecs[title.toLowerCase()] = mapTmdbListMovie(first);
       } catch(e){}
     }));
     if (Object.keys(newRecs).length > 0) setRecMovies(prev=>({...prev,...newRecs}));

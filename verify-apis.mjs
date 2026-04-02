@@ -1,5 +1,5 @@
 /**
- * One-off check: OMDb + Hugging Face endpoints respond OK (no secrets printed).
+ * One-off check: TMDB + Hugging Face endpoints respond OK (no secrets printed).
  * Run: node verify-apis.mjs
  */
 import fs from 'fs';
@@ -10,28 +10,39 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const secretsPath = path.join(__dirname, 'local-secrets.js');
 const raw = fs.readFileSync(secretsPath, 'utf8');
 const apiKey = raw.match(/API_KEY:\s*['"]([^'"]+)['"]/)?.[1] ?? '';
+const readToken =
+  raw.match(/TMDB_READ_TOKEN:\s*['"]([^'"]+)['"]/)?.[1] ??
+  raw.match(/TMDB_READ_TOKEN:\s*\r?\n\s*['"]([^'"]+)['"]/)?.[1] ??
+  '';
 const hfToken = raw.match(/HF_API_TOKEN:\s*['"]([^'"]+)['"]/)?.[1] ?? '';
 
-if (!apiKey || !hfToken) {
-  console.error('FAIL: Could not read API_KEY / HF_API_TOKEN from local-secrets.js');
+if ((!apiKey && !readToken) || !hfToken) {
+  console.error('FAIL: Need TMDB (API_KEY and/or TMDB_READ_TOKEN) and HF_API_TOKEN in local-secrets.js');
   process.exit(1);
 }
 
-const BASE = 'https://www.omdbapi.com/';
+const TMDB_BASE = 'https://api.themoviedb.org/3';
 const HF_URL =
   'https://router.huggingface.co/hf-inference/models/katanemo/Arch-Router-1.5B/v1/chat/completions';
 
 let ok = true;
 
-// OMDb
-const omdbUrl = `${BASE}?apikey=${encodeURIComponent(apiKey)}&i=tt15239678&plot=short`;
-const omdbRes = await fetch(omdbUrl);
-const omdbJson = await omdbRes.json();
-if (!omdbRes.ok || omdbJson.Response !== 'True') {
-  console.error('FAIL: OMDb', omdbRes.status, omdbJson.Error || omdbJson.Response);
+// TMDB (movie detail — Inception)
+const tmdbPath = '/movie/27205';
+let tmdbRes;
+if (readToken) {
+  tmdbRes = await fetch(`${TMDB_BASE}${tmdbPath}`, {
+    headers: { Authorization: `Bearer ${readToken}` },
+  });
+} else {
+  tmdbRes = await fetch(`${TMDB_BASE}${tmdbPath}?api_key=${encodeURIComponent(apiKey)}`);
+}
+const tmdbData = await tmdbRes.json().catch(() => ({}));
+if (!tmdbRes.ok || !tmdbData.title) {
+  console.error('FAIL: TMDB', tmdbRes.status, tmdbData.status_message || tmdbData.status_code || '');
   ok = false;
 } else {
-  console.log('OK: OMDb returned movie:', omdbJson.Title || '(title)');
+  console.log('OK: TMDB returned movie:', tmdbData.title);
 }
 
 // Hugging Face (minimal chat completion)

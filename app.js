@@ -1,7 +1,5 @@
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 const {
-  API_KEY,
-  BASE_URL,
   HF_API_TOKEN,
   HF_MODEL,
   HF_CHAT_URL,
@@ -9,7 +7,7 @@ const {
   LATEST_TRAILERS,
   MOOD_FILTERS,
 } = window.CineVaultConfig;
-const { omdbJson, getGlowColor } = window.CineVaultApi;
+const { tmdbJson, getGlowColor, mapTmdbListMovie, mapTmdbDetailToCard } = window.CineVaultApi;
 const {
   StarIcon,
   HeartIcon,
@@ -66,7 +64,7 @@ const [showKbd, setShowKbd] = useState(false);
 const [addToListMovie, setAddToListMovie] = useState(null);
 const [viewingList, setViewingList] = useState(null);
 const [theme, setTheme] = useState(() => localStorage.getItem('cv_theme') || 'dark');
-const [omdbAuthError, setOmdbAuthError] = useState(false);
+const [tmdbAuthError, setTmdbAuthError] = useState(false);
 
 // NEW: State for AI Reviews Summarizer
 const [reviewSummary, setReviewSummary] = useState(null);
@@ -90,9 +88,9 @@ const addToast = useCallback((msg) => {
 }, []);
 
 useEffect(() => {
-  const onOmdbAuth = () => setOmdbAuthError(true);
-  window.addEventListener('omdb-auth-fail', onOmdbAuth);
-  return () => window.removeEventListener('omdb-auth-fail', onOmdbAuth);
+  const onTmdbAuth = () => setTmdbAuthError(true);
+  window.addEventListener('tmdb-auth-fail', onTmdbAuth);
+  return () => window.removeEventListener('tmdb-auth-fail', onTmdbAuth);
 }, []);
 
 useEffect(() => {
@@ -125,8 +123,8 @@ useEffect(() => {
   const ac = new AbortController();
   debounceRef.current = setTimeout(async () => {
     try {
-      const data = await omdbJson(`${BASE_URL}?apikey=${API_KEY}&s=${encodeURIComponent(query)}&type=movie`, { signal: ac.signal });
-      if (data.Response==='True') { setLiveResults(data.Search.slice(0,5).map(m=>({id:m.imdbID,title:m.Title,release_date:m.Year,poster_path:m.Poster}))); setShowDropdown(true); }
+      const data = await tmdbJson(`search/movie?query=${encodeURIComponent(query)}`, { signal: ac.signal });
+      if (data.results && data.results.length) { setLiveResults(data.results.slice(0,5).map(mapTmdbListMovie)); setShowDropdown(true); }
     } catch(e) { if (e.name !== 'AbortError') {} }
   }, 280);
   return () => { clearTimeout(debounceRef.current); ac.abort(); };
@@ -137,7 +135,7 @@ const executeSearch = () => { setShowDropdown(false); setDebouncedQuery(query.tr
 const handleSurprise = async () => {
   const allIds = CURATED_CATEGORIES.flatMap(c=>c.ids);
   const id = allIds[Math.floor(Math.random()*allIds.length)];
-  try { const d = await omdbJson(`${BASE_URL}?apikey=${API_KEY}&i=${id}`); if(d.Response==='True') handleCardClick({id:d.imdbID,title:d.Title,release_date:d.Year,poster_path:d.Poster}); } catch(e){}
+  try { const d = await tmdbJson(`find/${id}?external_source=imdb_id`); const m = d.movie_results && d.movie_results[0]; if(m) handleCardClick(mapTmdbListMovie(m)); } catch(e){}
 };
 
 useEffect(() => {
@@ -146,8 +144,8 @@ useEffect(() => {
   const fetchMood = async () => {
     setSearchLoading(true);
     try {
-      const data = await omdbJson(`${BASE_URL}?apikey=${API_KEY}&s=${encodeURIComponent(activeMood)}&type=movie`, { signal: ac.signal });
-      if (data.Response==='True') setSearchMovies(data.Search.map(m=>({id:m.imdbID,title:m.Title,release_date:m.Year,poster_path:m.Poster})));
+      const data = await tmdbJson(`search/movie?query=${encodeURIComponent(activeMood)}`, { signal: ac.signal });
+      if (data.results && data.results.length) setSearchMovies(data.results.map(mapTmdbListMovie));
       else setSearchMovies([]);
     } catch(e){} finally { if (!ac.signal.aborted) setSearchLoading(false); }
   };
@@ -162,8 +160,8 @@ useEffect(() => {
   const fetch_ = async () => {
     setSearchLoading(true);
     try {
-      const data = await omdbJson(`${BASE_URL}?apikey=${API_KEY}&s=${encodeURIComponent(debouncedQuery)}&type=movie`, { signal: ac.signal });
-      if (data.Response==='True') setSearchMovies(data.Search.map(m=>({id:m.imdbID,title:m.Title,release_date:m.Year,poster_path:m.Poster})));
+      const data = await tmdbJson(`search/movie?query=${encodeURIComponent(debouncedQuery)}`, { signal: ac.signal });
+      if (data.results && data.results.length) setSearchMovies(data.results.map(mapTmdbListMovie));
       else setSearchMovies([]);
     } catch(e){} finally { if (!ac.signal.aborted) setSearchLoading(false); }
   };
@@ -177,8 +175,9 @@ useEffect(() => {
     try {
       const results = await Promise.all(CURATED_CATEGORIES.map(async cat => {
         const movies = (await Promise.all(cat.ids.map(async id => {
-          const d = await omdbJson(`${BASE_URL}?apikey=${API_KEY}&i=${id}`);
-          return d.Response==='True' ? {id:d.imdbID,title:d.Title,release_date:d.Year,poster_path:d.Poster,imdbRating:d.imdbRating} : null;
+          const d = await tmdbJson(`find/${id}?external_source=imdb_id`);
+          const m = d.movie_results && d.movie_results[0];
+          return m ? mapTmdbListMovie(m) : null;
         }))).filter(Boolean);
         return {...cat, movies};
       }));
@@ -193,19 +192,43 @@ useEffect(() => {
   setSimilarMovies([]); setDirectorMovies([]);
   const ac = new AbortController();
   const fetchSimilar = async () => {
-    if (!selectedMovie.genres?.length) return;
     try {
-      const genre = selectedMovie.genres[0];
-      const d = await omdbJson(`${BASE_URL}?apikey=${API_KEY}&s=${encodeURIComponent(genre)}&type=movie&y=${selectedMovie.release_date||''}`, { signal: ac.signal });
-      if (d.Response==='True') setSimilarMovies(d.Search.filter(m=>m.imdbID!==selectedMovie.id).slice(0,8).map(m=>({id:m.imdbID,title:m.Title,release_date:m.Year,poster_path:m.Poster})));
+      const d = await tmdbJson(`movie/${selectedMovie.id}/recommendations`, { signal: ac.signal });
+      if (d.results && d.results.length) {
+        setSimilarMovies(
+          d.results
+            .filter((m) => String(m.id) !== String(selectedMovie.id))
+            .slice(0, 8)
+            .map(mapTmdbListMovie)
+        );
+      }
     } catch(e){}
   };
   const fetchDirector = async () => {
     if (!selectedMovie.director || selectedMovie.director.includes(',')) return;
     const dirName = selectedMovie.director.split(',')[0].trim();
     try {
-      const d = await omdbJson(`${BASE_URL}?apikey=${API_KEY}&s=${encodeURIComponent(dirName)}&type=movie`, { signal: ac.signal });
-      if (d.Response==='True') setDirectorMovies(d.Search.filter(m=>m.imdbID!==selectedMovie.id).slice(0,6).map(m=>({id:m.imdbID,title:m.Title,release_date:m.Year,poster_path:m.Poster})));
+      const p = await tmdbJson(`search/person?query=${encodeURIComponent(dirName)}`, { signal: ac.signal });
+      const pid = p.results && p.results[0] && p.results[0].id;
+      if (!pid) return;
+      const cr = await tmdbJson(`person/${pid}/movie_credits`, { signal: ac.signal });
+      const directed = (cr.crew || []).filter((c) => c.job === 'Director' && String(c.id) !== String(selectedMovie.id));
+      const seen = new Set();
+      const rows = [];
+      for (const c of directed) {
+        const mid = String(c.id);
+        if (seen.has(mid)) continue;
+        seen.add(mid);
+        rows.push(mapTmdbListMovie({
+          id: c.id,
+          title: c.title,
+          release_date: c.release_date || '',
+          poster_path: c.poster_path,
+          vote_average: c.vote_average,
+        }));
+        if (rows.length >= 6) break;
+      }
+      setDirectorMovies(rows);
     } catch(e){}
   };
   Promise.all([fetchSimilar(), fetchDirector()]);
@@ -250,37 +273,24 @@ const handleCardClick = useCallback(async (movie) => {
   streakManager.logToday();
   if (movie.isHardcoded || movie.fullDataLoaded) return;
   try {
-    const data = await omdbJson(`${BASE_URL}?apikey=${API_KEY}&i=${movie.id}&plot=short`);
-    if (data.Response==='True') {
-      let rtScore=null, metaScore=null;
-      if (data.Ratings) { const rt=data.Ratings.find(r=>r.Source==="Rotten Tomatoes"); if(rt) rtScore=rt.Value; const meta=data.Ratings.find(r=>r.Source==="Metacritic"); if(meta) metaScore=meta.Value; }
-      setSelectedMovie(prev => prev&&prev.id===data.imdbID ? {
-        ...prev, fullDataLoaded:true,
-        overview: data.Plot!=='N/A'?data.Plot:'No description available.',
-        genres: data.Genre!=='N/A'?data.Genre.split(', '):[],
-        runtime: data.Runtime!=='N/A'?data.Runtime:null,
-        rated: data.Rated!=='N/A'?data.Rated:null,
-        director: data.Director!=='N/A'?data.Director:null,
-        actors: data.Actors!=='N/A'?data.Actors:null,
-        imdbRating: data.imdbRating!=='N/A'?data.imdbRating:null,
-        boxOffice: data.BoxOffice!=='N/A'?data.BoxOffice:null,
-        awards: data.Awards!=='N/A'?data.Awards:null,
-        language: data.Language!=='N/A'?data.Language:null,
-        country: data.Country!=='N/A'?data.Country:null,
-        rtRating: rtScore, metaRating: metaScore,
-        yt: movie.yt
-      } : prev);
-      const fullUrl = `${BASE_URL}?apikey=${API_KEY}&i=${movie.id}&plot=full`;
-      omdbJson(fullUrl).then(full => {
-        if (full.Response!=='True'||!full.Plot||full.Plot==='N/A') return;
-        setSelectedMovie(prev => prev&&prev.id===full.imdbID ? {...prev, overview: full.Plot} : prev);
-      }).catch(()=>{});
+    const data = await tmdbJson(`movie/${movie.id}?append_to_response=credits,release_dates`);
+    if (!data.__tmdbError && data.id) {
+      setSelectedMovie((prev) => (prev && String(prev.id) === String(movie.id) ? mapTmdbDetailToCard(data, prev) : prev));
     } else {
-      setSelectedMovie(prev => prev && prev.id === movie.id ? {
-        ...prev, fullDataLoaded: true,
-        overview: data.Error || 'Could not load details from OMDb.',
-        director: null, actors: null, imdbRating: null, rtRating: null, metaRating: null
-      } : prev);
+      setSelectedMovie((prev) =>
+        prev && String(prev.id) === String(movie.id)
+          ? {
+              ...prev,
+              fullDataLoaded: true,
+              overview: (data && data.status_message) || 'Could not load details from TMDB.',
+              director: null,
+              actors: null,
+              imdbRating: null,
+              rtRating: null,
+              metaRating: null,
+            }
+          : prev
+      );
     }
   } catch(e){}
 }, [historyManager, streakManager]);
@@ -316,11 +326,11 @@ return (
     <div className="toast-container">{toasts.map(t=><div key={t.id} className="toast">✅ {t.msg}</div>)}</div>
     <div className={`kbd-hint${showKbd?' visible':''}`}><kbd>/</kbd> to search &nbsp; <kbd>Esc</kbd> to close</div>
 
-    {omdbAuthError && (
+    {tmdbAuthError && (
       <div style={{position:'sticky',top:0,zIndex:200,background:'linear-gradient(90deg,rgba(180,40,40,0.95),rgba(120,30,30,0.95))',borderBottom:'1px solid rgba(255,255,255,0.12)',padding:'10px 16px',fontSize:13,color:'#fff',textAlign:'center',lineHeight:1.5}}>
-        <strong>OMDb API key rejected (401).</strong> Movie data will not load until you set a valid key. Get a free key at{' '}
-        <a href="https://www.omdbapi.com/apikey.aspx" target="_blank" rel="noopener noreferrer" style={{color:'#ffd4a8',textDecoration:'underline'}}>omdbapi.com/apikey.aspx</a>
-        , then replace <code style={{background:'rgba(0,0,0,0.25)',padding:'2px 6px',borderRadius:4}}>API_KEY</code> in <code style={{background:'rgba(0,0,0,0.25)',padding:'2px 6px',borderRadius:4}}>constants.js</code>.
+        <strong>TMDB authentication failed.</strong> Movie data will not load until you set a valid API key or read token. Create keys at{' '}
+        <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer" style={{color:'#ffd4a8',textDecoration:'underline'}}>themoviedb.org/settings/api</a>
+        , then put them in <code style={{background:'rgba(0,0,0,0.25)',padding:'2px 6px',borderRadius:4}}>local-secrets.js</code> (not committed).
       </div>
     )}
 
