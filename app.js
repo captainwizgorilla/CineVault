@@ -66,7 +66,6 @@ const [viewingList, setViewingList] = useState(null);
 const [theme, setTheme] = useState(() => localStorage.getItem('cv_theme') || 'dark');
 const [tmdbAuthError, setTmdbAuthError] = useState(false);
 
-// NEW: State for AI Reviews Summarizer
 const [reviewSummary, setReviewSummary] = useState(null);
 const [reviewLoading, setReviewLoading] = useState(false);
 
@@ -235,7 +234,6 @@ useEffect(() => {
   return () => ac.abort();
 }, [selectedMovie?.id, selectedMovie?.fullDataLoaded]);
 
-// NEW: AI Review Summarizer Effect
 useEffect(() => {
   if (modalTab === 'reviews' && selectedMovie && !reviewSummary && !reviewLoading) {
     setReviewLoading(true);
@@ -267,7 +265,7 @@ useEffect(() => {
 const handleCardClick = useCallback(async (movie) => {
   setShowDropdown(false); 
   setModalTab('overview');
-  setReviewSummary(null); // Reset AI summary when opening a new movie
+  setReviewSummary(null);
   setSelectedMovie(movie);
   historyManager.add(movie);
   streakManager.logToday();
@@ -334,7 +332,6 @@ return (
       </div>
     )}
 
-    {/* NAVBAR */}
     <nav className="navbar">
       <div className="navbar__logo" onClick={()=>{setQuery('');setDebouncedQuery('');setShowDropdown(false);setActiveMood(null);window.scrollTo(0,0);}}>Cine<span>Vault</span></div>
       <div className={`navbar__center${scrolled&&!isSearching?' visible':''}`}>
@@ -360,10 +357,9 @@ return (
         <button className="btn-nav" onClick={()=>setActivePanel('bingo')} title="Movie Bingo">🎯</button>
         <button className="btn-nav" onClick={()=>setActivePanel('tier')} title="Tier List">🏆</button>
       </div>
-    </nav>
+      </nav>
 
-    {/* HERO */}
-    <header className={`hero${isSearching?' collapsed':''}`}>
+      <header className={`hero${isSearching?' collapsed':''}`}>
       {!isSearching && <><h1 className="hero__title">Welcome.</h1><p className="hero__sub">Millions of movies to discover. Explore now.</p></>}
       <div className="hero__search-container">
         <div className="search-input-wrapper">
@@ -380,10 +376,9 @@ return (
         </div>
         <button className="btn-surprise" title="Surprise Me!" onClick={handleSurprise}>🎲</button>
       </div>
-    </header>
+      </header>
 
-    {/* MOOD FILTERS */}
-    {!isSearching && (
+      {!isSearching && (
       <div className="filters-bar">
         {MOOD_FILTERS.map((m,i) => (
           <button key={i} className={`filter-chip mood${activeMood===m.genre?' active':''}`} onClick={()=>setActiveMood(activeMood===m.genre?null:m.genre)}>{m.label}</button>
@@ -391,7 +386,6 @@ return (
       </div>
     )}
 
-    {/* SEARCH RESULTS */}
     {isSearching && (
       <section className="section">
         <div className="section__header">
@@ -419,7 +413,6 @@ return (
       </section>
     )}
 
-    {/* HOME */}
     {!isSearching && (<>
       {historyManager.history.length>0&&(
         <section className="section">
@@ -440,7 +433,6 @@ return (
         ))}
     </>)}
 
-    {/* MOVIE MODAL */}
     {selectedMovie && (
       <div className="modal-overlay" style={{background:`radial-gradient(circle at center,${getGlowColor(selectedMovie.title)} 0%,rgba(0,0,0,0.85) 70%)`}} onClick={e=>{if(e.target===e.currentTarget)setSelectedMovie(null);}}>
         <div className="modal">
@@ -460,9 +452,8 @@ return (
                 {selectedMovie.genres&&selectedMovie.genres.map(g=><span key={g} className="chip">{g}</span>)}
               </div>
               {selectedMovie.awards&&selectedMovie.awards!=='N/A'&&<div className="awards-badge">🏆 {selectedMovie.awards}</div>}
-              <div className="modal__tabs">
-                {/* UPDATED MODAL TABS WITH 'REVIEWS' */}
-                {['overview', 'reviews', 'similar', 'director'].map(t=><button key={t} className={`modal-tab${modalTab===t?' active':''}`} onClick={()=>setModalTab(t)}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>)}
+                <div className="modal__tabs">
+                  {['overview', 'reviews', 'similar', 'director'].map(t=><button key={t} className={`modal-tab${modalTab===t?' active':''}`} onClick={()=>setModalTab(t)}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>)}
               </div>
 
               {modalTab==='overview'&&(<>
@@ -507,9 +498,7 @@ return (
                   </button>
                 </div>
               </>)}
-
-              {/* NEW: REVIEWS TAB CONTENT */}
-              {modalTab === 'reviews' && (
+                {modalTab === 'reviews' && (
                 <div>
                   <p style={{fontSize:12, color:'var(--text-muted)', marginBottom:12}}>AI Sentiment Analysis</p>
                   <div style={{background: 'rgba(155,93,229,0.08)', border: '1px solid rgba(155,93,229,0.3)', borderRadius: 12, padding: '16px 20px'}}>
@@ -581,7 +570,6 @@ return (
       </div>
     )}
 
-    {/* PANELS */}
     {activePanel==='fav'&&(
       <>
         <div className="side-panel-overlay" onClick={()=>setActivePanel(null)}/>
@@ -637,7 +625,6 @@ return (
     {activePanel==='tier'&&<TierListPanel onClose={()=>setActivePanel(null)} favManager={favManager} watchManager={watchManager} ratingManager={ratingManager} historyManager={historyManager}/>}
     {activePanel==='streak'&&<StreakPanel onClose={()=>setActivePanel(null)} streakManager={streakManager}/>}
 
-    {/* VIEWING CUSTOM LIST */}
     {viewingList&&(
       <>
         <div className="side-panel-overlay" onClick={()=>setViewingList(null)}/>

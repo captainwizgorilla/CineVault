@@ -1,6 +1,3 @@
-/**
- * TMDB fetch + cache and Hugging Face chat message builder.
- */
 (function () {
   const C = window.CineVaultConfig;
   const cache = new Map();

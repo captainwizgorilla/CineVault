@@ -1,15 +1,9 @@
-/**
- * Shared config and static data for CineVault (proj pro 3).
- * Movie data: TMDB. Keys in local-secrets.js (see local-secrets.example.js).
- */
 const localSecrets = window.CineVaultSecrets || {};
 
 window.CineVaultConfig = {
-  // TMDB v3 API key (query param). Optional: TMDB_READ_TOKEN for Bearer auth instead.
   API_KEY: localSecrets.API_KEY || '',
   TMDB_READ_TOKEN: localSecrets.TMDB_READ_TOKEN || '',
   BASE_URL: 'https://api.themoviedb.org/3',
-  // HuggingFace token (used by the AI guide). Replace later or disable AI if not needed.
   HF_API_TOKEN: localSecrets.HF_API_TOKEN || '',
   HF_MODEL: 'katanemo/Arch-Router-1.5B',
   HF_CHAT_URL: 'https://router.huggingface.co/hf-inference/models/katanemo/Arch-Router-1.5B/v1/chat/completions',

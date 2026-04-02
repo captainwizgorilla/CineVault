@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".",
+  "headers": [
+    {
+      "source": "/(.*)\\.jsx",
+      "headers": [{ "key": "Content-Type", "value": "application/javascript; charset=utf-8" }]
+    }
+  ]
+}

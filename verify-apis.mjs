@@ -1,7 +1,3 @@
-/**
- * One-off check: TMDB + Hugging Face endpoints respond OK (no secrets printed).
- * Run: node verify-apis.mjs
- */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -27,7 +23,6 @@ const HF_URL =
 
 let ok = true;
 
-// TMDB (movie detail — Inception)
 const tmdbPath = '/movie/27205';
 let tmdbRes;
 if (readToken) {
@@ -45,7 +40,6 @@ if (!tmdbRes.ok || !tmdbData.title) {
   console.log('OK: TMDB returned movie:', tmdbData.title);
 }
 
-// Hugging Face (minimal chat completion)
 const hfRes = await fetch(HF_URL, {
   method: 'POST',
   headers: {
